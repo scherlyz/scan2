@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Presensi QR Mahasiswa</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #11998e, #38ef7d);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    input {
+      width: 90%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #11998e;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    #reader {
+      margin: 10px auto;
+    }
+
+    #result {
+      margin-top: 15px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2>Presensi QR - Cloud 101</h2>
+
+  <div id="step1">
+    <input type="text" id="user_id" placeholder="Masukkan NIM">
+    <br>
+    <button onclick="startScan()">Mulai Scan</button>
+  </div>
+
+  <div id="step2" style="display:none;">
+    <p>NIM: <strong id="nimDisplay"></strong></p>
+    <div id="reader" style="width:250px;"></div>
+  </div>
+
+  <div id="step3" style="display:none;">
+    <div id="result"></div>
+    <br>
+    <button onclick="resetScan()">Scan Lagi</button>
+  </div>
+</div>
+
+<script>
+
+const BASE_URL = "https://script.google.com/macros/s/AKfycbzBM2tZu5jvx-ie2OiIvCCvGpiycos9npwRZ117Guy8mKn4n4QUhF88_7QNHbANF1_u/exec";
+
+let html5QrCode;
+let isProcessing = false;
+
+function startScan() {
+
+  const user_id = document.getElementById("user_id").value.trim();
+
+  if (!user_id) {
+    alert("Masukkan NIM dulu");
+    return;
+  }
+
+  document.getElementById("nimDisplay").innerText = user_id;
+  document.getElementById("step1").style.display = "none";
+  document.getElementById("step2").style.display = "block";
+
+  html5QrCode = new Html5Qrcode("reader");
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10 }, // lebih fleksibel
+    onScanSuccess
+  );
+}
+
+async function onScanSuccess(decodedText) {
+
+  if (isProcessing) return;
+  isProcessing = true;
+
+  console.log("QR TERBACA:", decodedText);
+
+  let token = decodedText;
+
+  // Kalau QR berisi URL, ambil parameter token
+  try {
+    if (decodedText.includes("token=")) {
+      const url = new URL(decodedText);
+      token = url.searchParams.get("token");
+    }
+  } catch (e) {}
+
+  if (!token || !token.startsWith("TKN-")) {
+    document.getElementById("result").innerHTML =
+      "❌ QR tidak valid";
+    isProcessing = false;
+    return;
+  }
+
+  await html5QrCode.stop();
+
+  document.getElementById("step2").style.display = "none";
+  document.getElementById("step3").style.display = "block";
+  document.getElementById("result").innerHTML = "Memproses...";
+
+  await checkIn(token);
+}
+
+async function checkIn(token) {
+
+  const user_id = document.getElementById("user_id").value;
+
+  try {
+
+    const res = await fetch(`${BASE_URL}?path=presence/checkin`, {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: user_id,
+        device_id: "dev-" + Math.floor(Math.random()*1000),
+        course_id: "cloud-101",
+        session_id: "sesi-02",
+        qr_token: token
+      })
+    });
+
+    const text = await res.text();
+    console.log("SERVER RESPONSE:", text);
+
+    const data = JSON.parse(text);
+
+    if (data.ok) {
+      document.getElementById("result").innerHTML =
+        "✅ Check-in Berhasil<br><br>" +
+        "Presence ID: " + data.data.presence_id;
+    } else {
+      document.getElementById("result").innerHTML =
+        "❌ " + data.message;
+    }
+
+  } catch (err) {
+    console.error("FETCH ERROR:", err);
+    document.getElementById("result").innerHTML =
+      "❌ Gagal koneksi ke server";
+  }
+
+  isProcessing = false;
+}
+
+function resetScan() {
+  document.getElementById("step3").style.display = "none";
+  document.getElementById("step1").style.display = "block";
+}
+
+</script>
+
+</body>
+</html>
