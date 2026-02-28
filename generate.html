@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>QR Presensi</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      width: 350px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    input {
+      width: 90%;
+      padding: 8px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #667eea;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #5a67d8;
+    }
+
+    #qrcode {
+      margin-top: 20px;
+      transition: opacity 0.3s ease;
+    }
+
+    #countdown {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #e53e3e;
+    }
+
+    #status {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2>QR Presensi</h2>
+
+  <input type="text" id="course_id" value="cloud-101" placeholder="Course ID">
+  <input type="text" id="session_id" value="sesi-02" placeholder="Session ID">
+
+  <button onclick="generateQR()">Generate QR</button>
+
+  <div id="status"></div>
+  <div id="qrcode"></div>
+  <div id="countdown"></div>
+</div>
+
+<script>
+
+let timerInterval;
+let isGenerating = false;
+
+function generateQR() {
+
+  if (isGenerating) return;
+  isGenerating = true;
+
+  const course_id = document.getElementById("course_id").value;
+  const session_id = document.getElementById("session_id").value;
+
+  document.getElementById("status").innerText = "Generating new QR...";
+  document.getElementById("qrcode").innerHTML = "";
+  document.getElementById("countdown").innerText = "";
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+
+      isGenerating = false;
+
+      if (!data || !data.ok) {
+        document.getElementById("status").innerText =
+          "❌ Failed to generate QR";
+        return;
+      }
+
+      const token = data.qr_token;
+
+      document.getElementById("status").innerText =
+        "Token: " + token;
+
+      document.getElementById("qrcode").innerHTML =
+        '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='
+        + token + '" />';
+
+      startCountdown(120); // 2 menit
+
+    })
+    .withFailureHandler(function(error) {
+      isGenerating = false;
+      document.getElementById("status").innerText =
+        "❌ Server error";
+    })
+    .generateQrServer(course_id, session_id);
+}
+
+function startCountdown(seconds) {
+
+  clearInterval(timerInterval);
+
+  timerInterval = setInterval(function() {
+
+    document.getElementById("countdown").innerText =
+      "Expired in: " + seconds + " seconds";
+
+    seconds--;
+
+    if (seconds < 0) {
+
+      clearInterval(timerInterval);
+
+      document.getElementById("countdown").innerText =
+        "QR Expired ❌";
+
+      document.getElementById("qrcode").innerHTML = "";
+
+      // AUTO ROTATE QR
+      setTimeout(function() {
+        generateQR();
+      }, 1000);
+
+    }
+
+  }, 1000);
+}
+
+</script>
+
+</body>
+</html>
