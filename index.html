@@ -145,7 +145,7 @@ async function checkIn(token) {
 
   try {
     
-    const res = await fetch(BASE_URL, { 
+    const res = await fetch(BASE_URL +"?path=presence/checkin", { 
       method: "POST",
       headers: {
         "Content-Type": "text/plain;charset=utf-8" 
